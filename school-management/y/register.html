@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Register | School Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+        // 🔥 PASTE YOUR CORRECT FIREBASE CONFIG HERE
+        const firebaseConfig = {
+            apiKey: "AIzaSyCvIhJ2jAvnqnN3-ugKbWK30rU07uX73jg",
+            authDomain: "schoolmanagement-63b6a.firebaseapp.com",
+            projectId: "schoolmanagement-63b6a",
+            storageBucket: "schoolmanagement-63b6a.firebasestorage.app",
+            messagingSenderId: "993571708752",
+            appId: "1:993571708752:web:38d2e917f41e2ffd02d655"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+    </script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen p-4">
+    <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-md">
+        <h2 class="text-2xl font-bold text-center mb-6">Teacher Registration</h2>
+        <form id="registerForm">
+            <input type="text" id="fullname" placeholder="Full Name" class="w-full p-2 border rounded mb-2" required>
+            <input type="text" id="username" placeholder="Username" class="w-full p-2 border rounded mb-2" required>
+            <input type="email" id="email" placeholder="Email" class="w-full p-2 border rounded mb-2" required>
+            <input type="tel" id="phone" placeholder="Phone" class="w-full p-2 border rounded mb-2">
+            <select id="subject" class="w-full p-2 border rounded mb-2" required>
+                <option value="">Subject</option>
+                <option>Mathematics</option><option>Science</option><option>English</option>
+                <option>Social Studies</option><option>Computer Science</option>
+            </select>
+            <select id="class" class="w-full p-2 border rounded mb-2" required>
+                <option value="">Class</option>
+                <option>Class 5A</option><option>Class 5B</option><option>Class 6A</option><option>Class 6B</option>
+                <option>Class 7A</option><option>Class 7B</option><option>Class 8A</option><option>Class 8B</option>
+                <option>Class 9A</option><option>Class 9B</option><option>Class 10A</option><option>Class 10B</option>
+            </select>
+            <input type="number" id="experience" placeholder="Experience (years)" class="w-full p-2 border rounded mb-2">
+            <input type="password" id="password" placeholder="Password" class="w-full p-2 border rounded mb-2" required>
+            <input type="password" id="confirm" placeholder="Confirm Password" class="w-full p-2 border rounded mb-3" required>
+            <button type="submit" class="w-full bg-green-600 text-white py-2 rounded hover:bg-green-700">Register</button>
+        </form>
+        <p class="text-center mt-4"><a href="index.html" class="text-blue-600">Back to Login</a></p>
+    </div>
+
+    <!-- Success Modal -->
+    <div id="successModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded-lg text-center w-80">
+            <div class="text-green-500 text-5xl mb-2">✓</div>
+            <h3 class="text-xl font-bold">Registration Submitted</h3>
+            <p class="mt-2">Awaiting admin approval.</p>
+            <button onclick="window.location.href='index.html'" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">OK</button>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('registerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const pass = document.getElementById('password').value;
+            const conf = document.getElementById('confirm').value;
+            if (pass !== conf) { alert("Passwords don't match"); return; }
+            if (pass.length < 4) { alert("Password too short"); return; }
+
+            const username = document.getElementById('username').value.trim();
+            const email = document.getElementById('email').value.trim();
+
+            const existing = await db.collection('users').where('username', '==', username).get();
+            if (!existing.empty) { alert("Username exists"); return; }
+            const pendingCheck = await db.collection('pendingTeachers').where('username', '==', username).get();
+            if (!pendingCheck.empty) { alert("Already pending"); return; }
+
+            const teacherData = {
+                fullname: document.getElementById('fullname').value,
+                username,
+                email,
+                phone: document.getElementById('phone').value,
+                subject: document.getElementById('subject').value,
+                class: document.getElementById('class').value,
+                experience: document.getElementById('experience').value,
+                password: pass,
+                role: 'teacher',
+                status: 'pending',
+                registeredDate: new Date().toISOString()
+            };
+            await db.collection('pendingTeachers').doc('teacher_' + Date.now()).set(teacherData);
+            document.getElementById('successModal').classList.remove('hidden');
+            document.getElementById('registerForm').reset();
+        });
+    </script>
+</body>
+</html>

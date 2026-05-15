@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <div class="sidebar">
+            <h3>School MS</h3>
+            <nav>
+                <a href="#" onclick="showDashboard()">📊 Dashboard</a>
+                <a href="#" onclick="showStudents()">👨‍🎓 Students</a>
+                <a href="#" onclick="showAttendance()">📝 Attendance</a>
+                <a href="#" onclick="showResults()">📈 Results</a>
+                <a href="#" onclick="logout()">🚪 Logout</a>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Top Bar with Teacher Info -->
+            <div class="top-bar">
+                <div class="teacher-info">
+                    Welcome, <span id="teacherName">Teacher</span> | 
+                    Subject: <span id="teacherSubject">Math</span> | 
+                    Class: <span id="teacherClass">5A</span>
+                </div>
+            </div>
+
+            <!-- Dynamic Content Area -->
+            <div id="content-area">
+                <!-- Dashboard content loads here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+    <!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+
+<script>
+  // Your Firebase config (copy from step 2)
+  const firebaseConfig = {
+    apiKey: "YOUR_API_KEY",
+    authDomain: "YOUR_AUTH_DOMAIN",
+    projectId: "YOUR_PROJECT_ID",
+    storageBucket: "YOUR_STORAGE_BUCKET",
+    messagingSenderId: "YOUR_SENDER_ID",
+    appId: "YOUR_APP_ID"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const auth = firebase.auth();
+</script>
+</body>
+</html>

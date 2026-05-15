@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Management Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+       const firebaseConfig = {
+    apiKey: "AIzaSyCvIhJ2jAvnqnN3-ugKbWK30rU07uX73jg",
+    authDomain: "schoolmanagement-63b6a.firebaseapp.com",
+    projectId: "schoolmanagement-63b6a",
+    storageBucket: "schoolmanagement-63b6a.firebasestorage.app",
+    messagingSenderId: "993571708752",
+    appId: "1:993571708752:web:38d2e917f41e2ffd02d655"
+};
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+</head>
+<body class="bg-gray-100">
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-gray-800 text-white p-4">
+            <h2 class="text-xl font-bold mb-6">Admin Management Panel</h2>
+            <button onclick="loadSection('dashboard')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">Dashboard</button>
+            <button onclick="loadSection('pending')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">Pending Approvals</button>
+            <button onclick="loadSection('teachers')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">All Teachers</button>
+            <button onclick="loadSection('teacherAttendance')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">Teacher Attendance</button>
+            <button onclick="loadSection('students')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">All Students</button>
+            <button onclick="logout()" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mt-4 text-red-300">Logout</button>
+        </div>
+
+        <!-- Main content -->
+        <div class="flex-1 p-6">
+            <div id="contentArea" class="bg-white p-6 rounded shadow">
+                Loading...
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for approve/reject -->
+    <div id="approveModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded w-96">
+            <h3 id="modalTitle" class="text-xl font-bold mb-4">Approve Teacher</h3>
+            <p id="modalMsg" class="mb-4"></p>
+            <input type="hidden" id="pendingId">
+            <div class="flex gap-2">
+                <button onclick="confirmApprove()" class="bg-green-600 text-white px-4 py-2 rounded">Approve</button>
+                <button onclick="confirmReject()" class="bg-red-600 text-white px-4 py-2 rounded">Reject</button>
+                <button onclick="closeModal()" class="bg-gray-300 px-4 py-2 rounded">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Student Modal -->
+    <div id="studentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded w-96">
+            <h3 id="studentModalTitle" class="text-xl font-bold mb-4">Add Student</h3>
+            <input type="hidden" id="editStudentId">
+            <input type="text" id="studentName" placeholder="Student Name" class="w-full border p-2 rounded mb-2">
+            <input type="text" id="studentRoll" placeholder="Roll Number" class="w-full border p-2 rounded mb-2">
+            <select id="studentClass" class="w-full border p-2 rounded mb-2">
+                <option>Class 5A</option><option>Class 5B</option><option>Class 6A</option><option>Class 6B</option>
+                <option>Class 7A</option><option>Class 7B</option><option>Class 8A</option><option>Class 8B</option>
+            </select>
+            <input type="text" id="studentParent" placeholder="Parent Contact" class="w-full border p-2 rounded mb-4">
+            <button onclick="saveStudent()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+            <button onclick="closeStudentModal()" class="bg-gray-300 px-4 py-2 rounded ml-2">Cancel</button>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser || currentUser.role !== 'admin') window.location.href = 'index.html';
+
+        async function loadSection(section) {
+            document.getElementById('contentArea').innerHTML = '<div class="text-center p-10 text-gray-500">⏳ Loading...</div>';
+    if (section === 'dashboard') await showDashboard();
+    else if (section === 'pending') await showPending();
+    else if (section === 'teachers') await showTeachers();
+    else if (section === 'teacherAttendance') await showTeacherAttendance();
+    else if (section === 'students') await showStudents();
+        }
+
+        async function showDashboard() {
+    try {
+        const teachersSnap = await db.collection('users')
+            .where('role','==','teacher')
+            .where('status','==','approved')
+            .get();
+
+        const pendingSnap = await db.collection('pendingTeachers').get();
+
+        const studentsSnap = await db.collection('students').get();
+
+        const teachersCount = teachersSnap.size;
+        const pendingCount = pendingSnap.size;
+        const studentsCount = studentsSnap.size;
+
+        document.getElementById('contentArea').innerHTML = `
+            <h2 class="text-2xl font-bold mb-4">Dashboard</h2>
+            <div class="grid grid-cols-3 gap-4">
+                <div class="bg-blue-100 p-4 rounded text-center">
+                    <div class="text-3xl font-bold">${teachersCount}</div>
+                    <div>Teachers</div>
+                </div>
+                <div class="bg-yellow-100 p-4 rounded text-center">
+                    <div class="text-3xl font-bold">${pendingCount}</div>
+                    <div>Pending</div>
+                </div>
+                <div class="bg-green-100 p-4 rounded text-center">
+                    <div class="text-3xl font-bold">${studentsCount}</div>
+                    <div>Students</div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        document.getElementById('contentArea').innerHTML =
+            `<p class="text-red-600">Dashboard Error: ${error.message}</p>`;
+        console.error(error);
+    }
+}
+
+        async function showPending() {
+            const snap = await db.collection('pendingTeachers').get();
+            if (snap.empty) { document.getElementById('contentArea').innerHTML = '<p class="text-gray-500">No pending approvals.</p>'; return; }
+            let html = '<h2 class="text-2xl font-bold mb-4">Pending Approvals</h2><div class="overflow-x-auto"><table class="min-w-full bg-white border"><thead><tr class="bg-gray-200"><th class="p-2">Name</th><th>Username</th><th>Subject</th><th>Class</th><th>Action</th></tr></thead><tbody>';
+            snap.forEach(doc => {
+                let t = doc.data();
+                html += `<tr><td class="p-2">${t.fullname}</td><td>${t.username}</td><td>${t.subject}</td><td>${t.class}</td><td><button onclick="openApprove('${doc.id}')" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Approve/Reject</button></td></tr>`;
+            });
+            html += '</tbody></table></div>';
+            document.getElementById('contentArea').innerHTML = html;
+        }
+
+        window.openApprove = (id) => {
+            document.getElementById('pendingId').value = id;
+            document.getElementById('modalTitle').innerText = 'Approve Teacher';
+            document.getElementById('modalMsg').innerText = 'Approve or reject this teacher?';
+            document.getElementById('approveModal').classList.remove('hidden');
+        };
+
+        window.confirmApprove = async () => {
+            const id = document.getElementById('pendingId').value;
+            const doc = await db.collection('pendingTeachers').doc(id).get();
+            if (!doc.exists) { alert("Not found"); closeModal(); return; }
+            const teacher = doc.data();
+            try {
+                const userCred = await auth.createUserWithEmailAndPassword(teacher.email, teacher.password);
+                teacher.status = 'approved';
+                teacher.uid = userCred.user.uid;
+                await db.collection('users').doc(userCred.user.uid).set(teacher);
+                await db.collection('pendingTeachers').doc(id).delete();
+                alert(`Teacher ${teacher.fullname} approved.`);
+                closeModal();
+                loadSection('pending');
+                loadSection('dashboard');
+            } catch (err) {
+                alert("Error creating auth user: " + err.message);
+            }
+        };
+
+        window.confirmReject = async () => {
+            const id = document.getElementById('pendingId').value;
+            await db.collection('pendingTeachers').doc(id).delete();
+            alert('Teacher rejected');
+            closeModal();
+            loadSection('pending');
+        };
+
+        function closeModal() { document.getElementById('approveModal').classList.add('hidden'); }
+
+        async function showTeachers() {
+            const snap = await db.collection('users').where('role','==','teacher').get();
+            let html = '<h2 class="text-2xl font-bold mb-4">All Teachers</h2><table class="min-w-full bg-white border"><thead><tr class="bg-gray-200"><th class="p-2">Name</th><th>Username</th><th>Email</th><th>Subject</th><th>Class</th><th>Status</th></tr></thead><tbody>';
+            snap.forEach(doc => {
+                let t = doc.data();
+                html += `<tr><td class="p-2">${t.fullname}</td><td>${t.username}</td><td>${t.email}</td><td>${t.subject}</td><td>${t.class}</td><td><span class="bg-green-100 text-green-800 px-2 py-1 rounded text-xs">${t.status}</span></td></tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('contentArea').innerHTML = html;
+        }
+
+        async function showTeacherAttendance() {
+            const today = new Date().toISOString().split('T')[0];
+            const html = `
+                <h2 class="text-2xl font-bold mb-4">Teacher Attendance</h2>
+                <div class="mb-4"><label class="font-bold">Date:</label> <input type="date" id="attDate" value="${today}" onchange="loadTeacherAtt()" class="border p-1 rounded"></div>
+                <div id="teacherAttList"></div>
+                <div id="teacherAttBtn"></div>
+            `;
+            document.getElementById('contentArea').innerHTML = html;
+            await loadTeacherAtt();
+        }
+
+        window.loadTeacherAtt = async () => {
+            const date = document.getElementById('attDate').value;
+            const isToday = date === new Date().toISOString().split('T')[0];
+            const teachersSnap = await db.collection('users').where('role','==','teacher').where('status','==','approved').get();
+            const attSnap = await db.collection('teacherAttendance').get();
+            let table = '<table class="min-w-full bg-white border"><thead><tr class="bg-gray-200"><th class="p-2">Teacher</th><th>Subject</th><th>Status</th></tr></thead><tbody>';
+            for (const doc of teachersSnap.docs) {
+                const t = doc.data();
+                const record = attSnap.docs.find(d => d.data().teacherId === doc.id && new Date(d.data().date).toISOString().split('T')[0] === date);
+                const status = record ? record.data().status : (isToday ? 'pending' : 'Not marked');
+                let display = '';
+                if (isToday) {
+                    display = `<select id="att_${doc.id}" class="border p-1 rounded"><option value="present" ${status==='present'?'selected':''}>Present</option><option value="absent" ${status==='absent'?'selected':''}>Absent</option></select>`;
+                } else {
+                    display = `<span>${status}</span>`;
+                }
+                table += `<tr><td class="p-2">${t.fullname}</td><td>${t.subject}</td><td>${display}</td></tr>`;
+            }
+            table += '</tbody></table>';
+            document.getElementById('teacherAttList').innerHTML = table;
+            const btnDiv = document.getElementById('teacherAttBtn');
+            if (isToday) btnDiv.innerHTML = '<button onclick="saveTeacherAtt()" class="bg-blue-600 text-white px-4 py-2 rounded mt-4">Save Attendance</button>';
+            else btnDiv.innerHTML = '<p class="text-gray-500 mt-4">Past date – view only</p>';
+        };
+
+        window.saveTeacherAtt = async () => {
+            const date = document.getElementById('attDate').value;
+            const teachersSnap = await db.collection('users').where('role','==','teacher').where('status','==','approved').get();
+            const existing = await db.collection('teacherAttendance').get();
+            for (const doc of existing.docs) {
+                if (new Date(doc.data().date).toISOString().split('T')[0] === date) await db.collection('teacherAttendance').doc(doc.id).delete();
+            }
+            for (const doc of teachersSnap.docs) {
+                const select = document.getElementById(`att_${doc.id}`);
+                if (select) {
+                    await db.collection('teacherAttendance').add({
+                        teacherId: doc.id,
+                        teacherName: doc.data().fullname,
+                        status: select.value,
+                        date: new Date(date).toISOString()
+                    });
+                }
+            }
+            alert('Saved');
+            loadTeacherAtt();
+        };
+
+        async function showStudents() {
+            const snap = await db.collection('students').get();
+            let html = `<h2 class="text-2xl font-bold mb-4">All Students</h2><button onclick="openStudentModal()" class="bg-green-600 text-white px-4 py-2 rounded mb-4">+ Add Student</button><table class="min-w-full bg-white border"><thead><tr class="bg-gray-200"><th class="p-2">Roll</th><th>Name</th><th>Class</th><th>Parent</th><th>Actions</th></tr></thead><tbody>`;
+            snap.forEach(doc => {
+                let s = doc.data();
+                html += `<tr><td class="p-2">${s.rollNo}</td><td>${s.name}</td><td>${s.class}</td><td>${s.parentContact || '-'}</td><td><button onclick="editStudent('${doc.id}')" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Edit</button> <button onclick="deleteStudent('${doc.id}')" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete</button></td></tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('contentArea').innerHTML = html;
+        }
+
+        window.openStudentModal = () => {
+            document.getElementById('studentModalTitle').innerText = 'Add Student';
+            document.getElementById('editStudentId').value = '';
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentRoll').value = '';
+            document.getElementById('studentClass').value = 'Class 5A';
+            document.getElementById('studentParent').value = '';
+            document.getElementById('studentModal').classList.remove('hidden');
+        };
+
+        window.saveStudent = async () => {
+            const name = document.getElementById('studentName').value.trim();
+            const roll = document.getElementById('studentRoll').value.trim();
+            const cls = document.getElementById('studentClass').value;
+            const parent = document.getElementById('studentParent').value;
+            const editId = document.getElementById('editStudentId').value;
+            if (!name || !roll) { alert("Required fields"); return; }
+            if (editId) {
+                await db.collection('students').doc(editId).update({ name, rollNo: roll, class: cls, parentContact: parent });
+                alert("Updated");
+            } else {
+                const existing = await db.collection('students').where('rollNo','==',roll).where('class','==',cls).get();
+                if (!existing.empty) { alert("Roll number exists"); return; }
+                await db.collection('students').add({ name, rollNo: roll, class: cls, parentContact: parent, teacher: 'Admin' });
+                alert("Added");
+            }
+            closeStudentModal();
+            showStudents();
+        };
+
+        window.editStudent = async (id) => {
+            const doc = await db.collection('students').doc(id).get();
+            if (doc.exists) {
+                const s = doc.data();
+                document.getElementById('studentModalTitle').innerText = 'Edit Student';
+                document.getElementById('editStudentId').value = id;
+                document.getElementById('studentName').value = s.name;
+                document.getElementById('studentRoll').value = s.rollNo;
+                document.getElementById('studentClass').value = s.class;
+                document.getElementById('studentParent').value = s.parentContact || '';
+                document.getElementById('studentModal').classList.remove('hidden');
+            }
+        };
+
+        window.deleteStudent = async (id) => {
+            if (confirm("Delete student?")) {
+                await db.collection('students').doc(id).delete();
+                showStudents();
+            }
+        };
+
+        function closeStudentModal() { document.getElementById('studentModal').classList.add('hidden'); }
+
+        function logout() { auth.signOut(); localStorage.clear(); window.location.href = 'index.html'; }
+
+        // Load dashboard initially
+        loadSection('dashboard');
+    </script>
+</body>
+</html>
