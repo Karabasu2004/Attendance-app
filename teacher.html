@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Teacher Attendance Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+    apiKey: "AIzaSyCvIhJ2jAvnqnN3-ugKbWK30rU07uX73jg",
+    authDomain: "schoolmanagement-63b6a.firebaseapp.com",
+    projectId: "schoolmanagement-63b6a",
+    storageBucket: "schoolmanagement-63b6a.firebasestorage.app",
+    messagingSenderId: "993571708752",
+    appId: "1:993571708752:web:38d2e917f41e2ffd02d655"
+};
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+</head>
+<body class="bg-gray-100">
+    <div class="flex min-h-screen">
+        <div class="w-64 bg-gray-800 text-white p-4">
+            <h2 class="text-xl font-bold mb-6">Teacher Attendance Dashboard</h2>
+            <button onclick="loadSection('dashboard')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">Dashboard</button>
+            <button onclick="loadSection('students')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">My Students</button>
+            <button onclick="openStudentModal()" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">➕ Add Student</button>
+            <button onclick="loadSection('attendance')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">Mark Attendance</button>
+            <button onclick="loadSection('tests')" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mb-1">Tests & Marks</button>
+            <button onclick="logout()" class="block w-full text-left py-2 px-3 rounded hover:bg-gray-700 mt-4 text-red-300">Logout</button>
+        </div>
+        <div class="flex-1 p-6">
+            <div id="contentArea" class="bg-white p-6 rounded shadow">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Student Modal -->
+    <div id="studentModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded w-96">
+            <h3 id="studentModalTitle" class="text-xl font-bold mb-4">Add Student</h3>
+            <input type="hidden" id="editStudentId">
+            <input type="text" id="studentName" placeholder="Student Name" class="w-full border p-2 rounded mb-2">
+            <input type="text" id="studentRoll" placeholder="Roll Number" class="w-full border p-2 rounded mb-2">
+            <input type="text" id="studentParent" placeholder="Parent Contact" class="w-full border p-2 rounded mb-4">
+            <button onclick="saveStudent()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+            <button onclick="closeStudentModal()" class="bg-gray-300 px-4 py-2 rounded ml-2">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Test Modal -->
+    <div id="testModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded w-96">
+            <h3 id="testModalTitle" class="text-xl font-bold mb-4">Create Test</h3>
+            <input type="hidden" id="editTestId">
+            <input type="text" id="testName" placeholder="Test Name" class="w-full border p-2 rounded mb-2">
+            <input type="number" id="testMaxMarks" placeholder="Max Marks" value="100" class="w-full border p-2 rounded mb-2">
+            <input type="date" id="testDate" class="w-full border p-2 rounded mb-4">
+            <button onclick="saveTest()" class="bg-blue-600 text-white px-4 py-2 rounded">Save</button>
+            <button onclick="closeTestModal()" class="bg-gray-300 px-4 py-2 rounded ml-2">Cancel</button>
+        </div>
+    </div>
+
+    <!-- Marks Modal -->
+    <div id="marksModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center">
+        <div class="bg-white p-6 rounded w-full max-w-2xl">
+            <h3 id="marksModalTitle" class="text-xl font-bold mb-4">Enter Marks</h3>
+            <input type="hidden" id="currentTestId">
+            <div id="marksEntry" class="max-h-96 overflow-y-auto"></div>
+            <div class="mt-4"><button onclick="saveMarks()" class="bg-blue-600 text-white px-4 py-2 rounded">Save Marks</button> <button onclick="closeMarksModal()" class="bg-gray-300 px-4 py-2 rounded ml-2">Cancel</button></div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = JSON.parse(localStorage.getItem('currentUser'));
+        if (!currentUser || currentUser.role !== 'teacher') window.location.href = 'index.html';
+
+        async function getMyStudents() {
+            const snap = await db.collection('students').where('class','==',currentUser.class).get();
+            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+
+        async function getMyTests() {
+            const snap = await db.collection('tests').where('class','==',currentUser.class).get();
+            return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        }
+
+        async function loadSection(section) {
+    document.getElementById('contentArea').innerHTML =
+        '<div class="text-center p-10 text-gray-500">⏳ Loading...</div>';
+
+    if (section === 'dashboard') await showDashboard();
+    else if (section === 'students') await showStudents();
+    else if (section === 'attendance') await showAttendance();
+    else if (section === 'tests') await showTests();
+}
+
+        async function showDashboard() {
+            const students = await getMyStudents();
+            const attSnap = await db.collection('attendance').where('class','==',currentUser.class).get();
+            const today = new Date().toDateString();
+            let present = 0;
+            attSnap.forEach(d => { if (new Date(d.data().date).toDateString() === today && d.data().status === 'present') present++; });
+            const percent = students.length ? Math.round((present/students.length)*100) : 0;
+            document.getElementById('contentArea').innerHTML = `
+                <h2 class="text-2xl font-bold mb-4">Dashboard</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="bg-blue-100 p-4 rounded text-center"><div class="text-3xl font-bold">${students.length}</div><div>My Students</div></div>
+                    <div class="bg-green-100 p-4 rounded text-center"><div class="text-3xl font-bold">${percent}%</div><div>Today's Attendance</div></div>
+                </div>
+            `;
+        }
+
+        async function showStudents() {
+            const students = await getMyStudents();
+            let html = '<h2 class="text-2xl font-bold mb-4">My Students</h2><table class="min-w-full bg-white border"><thead><tr class="bg-gray-200"><th class="p-2">Roll</th><th>Name</th><th>Parent</th><th>Actions</th></tr></thead><tbody>';
+            students.forEach(s => {
+                html += `<tr><td class="p-2">${s.rollNo}</td><td>${s.name}</td><td>${s.parentContact || '-'}</td><td><button onclick="editStudent('${s.id}')" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Edit</button> <button onclick="deleteStudent('${s.id}')" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete</button></td></tr>`;
+            });
+            html += '</tbody></table>';
+            document.getElementById('contentArea').innerHTML = html;
+        }
+
+        window.openStudentModal = () => {
+            document.getElementById('studentModalTitle').innerText = 'Add Student';
+            document.getElementById('editStudentId').value = '';
+            document.getElementById('studentName').value = '';
+            document.getElementById('studentRoll').value = '';
+            document.getElementById('studentParent').value = '';
+            document.getElementById('studentModal').classList.remove('hidden');
+        };
+
+        window.saveStudent = async () => {
+            const name = document.getElementById('studentName').value.trim();
+            const roll = document.getElementById('studentRoll').value.trim();
+            const parent = document.getElementById('studentParent').value;
+            const editId = document.getElementById('editStudentId').value;
+            if (!name || !roll) { alert("Required"); return; }
+            if (editId) {
+                await db.collection('students').doc(editId).update({ name, rollNo: roll, parentContact: parent });
+                alert("Updated");
+            } else {
+                const existing = await db.collection('students').where('rollNo','==',roll).where('class','==',currentUser.class).get();
+                if (!existing.empty) { alert("Roll exists"); return; }
+                await db.collection('students').add({ name, rollNo: roll, class: currentUser.class, parentContact: parent, teacher: currentUser.fullname });
+                alert("Added");
+            }
+            closeStudentModal();
+            loadSection('students');
+        };
+
+        window.editStudent = async (id) => {
+            const doc = await db.collection('students').doc(id).get();
+            if (doc.exists) {
+                const s = doc.data();
+                document.getElementById('studentModalTitle').innerText = 'Edit Student';
+                document.getElementById('editStudentId').value = id;
+                document.getElementById('studentName').value = s.name;
+                document.getElementById('studentRoll').value = s.rollNo;
+                document.getElementById('studentParent').value = s.parentContact || '';
+                document.getElementById('studentModal').classList.remove('hidden');
+            }
+        };
+
+        window.deleteStudent = async (id) => {
+            if (confirm("Delete student? It also deletes attendance & marks.")) {
+                await db.collection('students').doc(id).delete();
+                // Also delete their attendance and marks (simplified)
+                loadSection('students');
+            }
+        };
+
+        function closeStudentModal() { document.getElementById('studentModal').classList.add('hidden'); }
+
+        async function showAttendance() {
+            const today = new Date().toISOString().split('T')[0];
+            const html = `<h2 class="text-2xl font-bold mb-4">Student Attendance</h2><div class="mb-4"><label class="font-bold">Date:</label> <input type="date" id="attDate" value="${today}" onchange="loadAttendance()" class="border p-1 rounded"></div><div id="attList"></div><div id="attBtn"></div>`;
+            document.getElementById('contentArea').innerHTML = html;
+            await loadAttendance();
+        }
+
+        window.loadAttendance = async () => {
+            const date = document.getElementById('attDate').value;
+            const isToday = date === new Date().toISOString().split('T')[0];
+            const students = await getMyStudents();
+            const attSnap = await db.collection('attendance').get();
+            let table = '<table class="min-w-full bg-white border"><thead><tr class="bg-gray-200"><th class="p-2">Roll</th><th>Name</th><th>Status</th></tr></thead><tbody>';
+            for (let s of students) {
+                const record = attSnap.docs.find(d => d.data().rollNo === s.rollNo && d.data().class === currentUser.class && new Date(d.data().date).toISOString().split('T')[0] === date);
+                const status = record ? record.data().status : (isToday ? 'present' : 'Not marked');
+                let display = '';
+                if (isToday) {
+                    display = `<select id="att_${s.rollNo}" class="border p-1 rounded"><option value="present" ${status==='present'?'selected':''}>Present</option><option value="absent" ${status==='absent'?'selected':''}>Absent</option><option value="late" ${status==='late'?'selected':''}>Late</option></select>`;
+                } else {
+                    display = `<span>${status}</span>`;
+                }
+                table += `<tr><td class="p-2">${s.rollNo}</td><td>${s.name}</td><td>${display}</td></tr>`;
+            }
+            table += '</tbody></table>';
+            document.getElementById('attList').innerHTML = table;
+            const btnDiv = document.getElementById('attBtn');
+            if (isToday) btnDiv.innerHTML = '<button onclick="saveAttendance()" class="bg-blue-600 text-white px-4 py-2 rounded mt-4">Save Attendance</button>';
+            else btnDiv.innerHTML = '<p class="text-gray-500 mt-4">Past date – view only</p>';
+        };
+
+        window.saveAttendance = async () => {
+            const date = document.getElementById('attDate').value;
+            const students = await getMyStudents();
+            const existing = await db.collection('attendance').get();
+            for (let doc of existing.docs) {
+                const data = doc.data();
+                if (data.class === currentUser.class && new Date(data.date).toISOString().split('T')[0] === date) await db.collection('attendance').doc(doc.id).delete();
+            }
+            for (let s of students) {
+                const select = document.getElementById(`att_${s.rollNo}`);
+                if (select) {
+                    await db.collection('attendance').add({
+                        studentName: s.name,
+                        rollNo: s.rollNo,
+                        class: currentUser.class,
+                        status: select.value,
+                        date: new Date(date).toISOString(),
+                        teacher: currentUser.fullname
+                    });
+                }
+            }
+            alert('Saved');
+            loadAttendance();
+        };
+
+        async function showTests() {
+            const tests = await getMyTests();
+            let html = '<h2 class="text-2xl font-bold mb-4">My Tests</h2><button onclick="openTestModal()" class="bg-green-600 text-white px-4 py-2 rounded mb-4">+ Create Test</button><div id="testsList"></div>';
+            document.getElementById('contentArea').innerHTML = html;
+            if (tests.length === 0) document.getElementById('testsList').innerHTML = '<p class="text-gray-500">No tests yet.</p>';
+            else {
+                let testsHtml = '';
+                for (let test of tests) {
+                    const marksSnap = await db.collection('marks').where('testId','==',test.id).get();
+                    const students = await getMyStudents();
+                    testsHtml += `<div class="border p-4 rounded mb-4"><div class="flex justify-between items-center"><div><span class="font-bold">${test.name}</span> (Max: ${test.maxMarks}) ${test.date ? ' - '+test.date : ''}</div><div><button onclick="enterMarks('${test.id}')" class="bg-blue-500 text-white px-2 py-1 rounded text-sm">Enter Marks</button> <button onclick="deleteTest('${test.id}')" class="bg-red-500 text-white px-2 py-1 rounded text-sm">Delete</button></div></div><div>Marks entered: ${marksSnap.size}/${students.length}</div><div id="preview_${test.id}" class="mt-2"></div></div>`;
+                }
+                document.getElementById('testsList').innerHTML = testsHtml;
+                for (let test of tests) await loadPreview(test.id);
+            }
+        }
+
+        async function loadPreview(testId) {
+            const marksSnap = await db.collection('marks').where('testId','==',testId).get();
+            const container = document.getElementById(`preview_${testId}`);
+            if (!container) return;
+            if (marksSnap.empty) { container.innerHTML = '<p class="text-gray-400 text-sm">No marks yet</p>'; return; }
+            let html = '<table class="min-w-full text-sm"><thead><tr><th>Roll</th><th>Name</th><th>Marks</th></tr></thead><tbody>';
+            marksSnap.forEach(d => { let m = d.data(); html += `<tr><td>${m.rollNo}</td><td>${m.studentName}</td><td>${m.marks}</td></tr>`; });
+            html += '</tbody></table>';
+            container.innerHTML = html;
+        }
+
+        window.openTestModal = () => {
+            document.getElementById('testModalTitle').innerText = 'Create Test';
+            document.getElementById('editTestId').value = '';
+            document.getElementById('testName').value = '';
+            document.getElementById('testMaxMarks').value = '100';
+            document.getElementById('testDate').value = '';
+            document.getElementById('testModal').classList.remove('hidden');
+        };
+
+        window.saveTest = async () => {
+            const name = document.getElementById('testName').value.trim();
+            const max = parseInt(document.getElementById('testMaxMarks').value);
+            const date = document.getElementById('testDate').value;
+            const editId = document.getElementById('editTestId').value;
+            if (!name || isNaN(max)) { alert("Invalid test data"); return; }
+            if (editId) {
+                await db.collection('tests').doc(editId).update({ name, maxMarks: max, date });
+                alert("Test updated");
+            } else {
+                await db.collection('tests').add({ name, maxMarks: max, date, class: currentUser.class, teacherId: currentUser.id });
+                alert("Test created");
+            }
+            closeTestModal();
+            showTests();
+        };
+
+        window.deleteTest = async (id) => {
+            if (confirm("Delete test and all its marks?")) {
+                const marks = await db.collection('marks').where('testId','==',id).get();
+                marks.forEach(d => d.ref.delete());
+                await db.collection('tests').doc(id).delete();
+                showTests();
+            }
+        };
+
+        window.enterMarks = async (testId) => {
+            const test = (await getMyTests()).find(t => t.id === testId);
+            if (!test) return;
+            const students = await getMyStudents();
+            const existing = await db.collection('marks').where('testId','==',testId).get();
+            document.getElementById('currentTestId').value = testId;
+            document.getElementById('marksModalTitle').innerHTML = `Marks for ${test.name} (Max ${test.maxMarks})`;
+            let formHtml = '<table class="min-w-full"><thead><tr><th>Roll</th><th>Name</th><th>Marks</th></tr></thead><tbody>';
+            for (let s of students) {
+                const markDoc = existing.docs.find(d => d.data().rollNo === s.rollNo);
+                const val = markDoc ? markDoc.data().marks : '';
+                formHtml += `<tr><td>${s.rollNo}</td><td>${s.name}</td><td><input type="number" id="mark_${s.rollNo}" value="${val}" min="0" max="${test.maxMarks}" class="border p-1 rounded w-24"></td></tr>`;
+            }
+            formHtml += '</tbody></table>';
+            document.getElementById('marksEntry').innerHTML = formHtml;
+            document.getElementById('marksModal').classList.remove('hidden');
+        };
+
+        window.saveMarks = async () => {
+            const testId = document.getElementById('currentTestId').value;
+            const test = (await getMyTests()).find(t => t.id === testId);
+            if (!test) return;
+            const students = await getMyStudents();
+            const existing = await db.collection('marks').where('testId','==',testId).get();
+            for (let doc of existing.docs) await doc.ref.delete();
+            for (let s of students) {
+                const marks = parseFloat(document.getElementById(`mark_${s.rollNo}`).value);
+                if (!isNaN(marks)) {
+                    await db.collection('marks').add({
+                        testId, rollNo: s.rollNo, studentName: s.name, marks, class: currentUser.class
+                    });
+                }
+            }
+            alert('Marks saved');
+            closeMarksModal();
+            showTests();
+        };
+
+        function closeTestModal() { document.getElementById('testModal').classList.add('hidden'); }
+        function closeMarksModal() { document.getElementById('marksModal').classList.add('hidden'); }
+
+        function logout() { auth.signOut(); localStorage.clear(); window.location.href = 'index.html'; }
+
+        loadSection('dashboard');
+    </script>
+</body>
+</html>

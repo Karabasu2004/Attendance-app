@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Smart Attendance Management System</title>
+
+<meta name="description" content="Smart Attendance Management System for schools, colleges and institutes. Manage student attendance online easily.">
+
+<meta name="keywords" content="attendance system, student attendance, college attendance app, LMS attendance">
+
+<meta name="author" content="Karabasappa G">
+
+
+
+
+
+<!-- Open Graph for social media -->
+<meta property="og:title" content="Smart Attendance Management System">
+<meta property="og:description" content="Online attendance management system for students and teachers">
+<meta property="og:type" content="website">
+
+<!-- Favicon -->
+<link rel="icon" href="icon.png">
+
+<!-- Theme Color -->
+<meta name="theme-color" content="#293981">
+
+    <link rel="manifest" href="manifest.json">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCvIhJ2jAvnqnN3-ugKbWK30rU07uX73jg",
+            authDomain: "schoolmanagement-63b6a.firebaseapp.com",
+            projectId: "schoolmanagement-63b6a",
+            storageBucket: "schoolmanagement-63b6a.firebasestorage.app",
+            messagingSenderId: "993571708752",
+            appId: "1:993571708752:web:38d2e917f41e2ffd02d655"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+    </script>
+</head>
+
+<body class="min-h-screen bg-gradient-to-br from-blue-900 via-indigo-800 to-purple-800 flex items-center justify-center p-4">
+
+    <div class="w-full max-w-5xl bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl overflow-hidden grid md:grid-cols-2 border border-white/20">
+
+        <!-- Left Side -->
+        <div class="hidden md:flex flex-col justify-center p-10 text-white">
+            <div class="text-5xl mb-4">🏫</div>
+            <h1 class="text-4xl font-bold mb-4">Smart Attendance Management System</h1>
+            <p class="text-blue-100 text-lg">
+                Manage teachers, students, attendance, marks and approvals from one simple platform.
+            </p>
+
+            <div class="grid grid-cols-2 gap-4 mt-10">
+                <div class="bg-white/10 p-4 rounded-xl">
+                    <div class="text-2xl">👨‍🏫</div>
+                    <p class="font-semibold mt-2">Teacher Panel</p>
+                </div>
+                <div class="bg-white/10 p-4 rounded-xl">
+                    <div class="text-2xl">📊</div>
+                    <p class="font-semibold mt-2">Admin Dashboard</p>
+                </div>
+                <div class="bg-white/10 p-4 rounded-xl">
+                    <div class="text-2xl">📝</div>
+                    <p class="font-semibold mt-2">Attendance</p>
+                </div>
+                <div class="bg-white/10 p-4 rounded-xl">
+                    <div class="text-2xl">📚</div>
+                    <p class="font-semibold mt-2">Student Records</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-white p-8 md:p-12">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-3">🔐</div>
+                <h2 class="text-3xl font-bold text-gray-800">Welcome Back</h2>
+                <p class="text-gray-500 mt-2">Login to continue</p>
+            </div>
+
+            <form id="loginForm" class="space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Username</label>
+                    <input 
+                        type="text" 
+                        id="username" 
+                        placeholder="Enter username"
+                        class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition"
+                        required>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-1">Password</label>
+                    <div class="relative">
+                        <input 
+                            type="password" 
+                            id="password" 
+                            placeholder="Enter password"
+                            class="w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition pr-12"
+                            required>
+                        <button 
+                            type="button" 
+                            onclick="togglePassword()"
+                            class="absolute right-3 top-3 text-gray-500 hover:text-blue-600">
+                            👁
+                        </button>
+                    </div>
+                </div>
+
+                <button 
+                    type="submit" 
+                    id="loginBtn"
+                    class="w-full bg-blue-600 text-white py-3 rounded-xl font-semibold hover:bg-blue-700 active:scale-95 transition shadow-lg">
+                    Login
+                </button>
+            </form>
+
+            <div id="message" class="text-sm mt-4 text-center font-medium"></div>
+
+            <div class="mt-6 text-center">
+                <p class="text-gray-600">
+                    New Teacher?
+                    <a href="register.html" class="text-blue-600 font-semibold hover:underline">
+                        Register here
+                    </a>
+                </p>
+            </div>
+
+            <p class="text-center text-xs text-gray-400 mt-8">
+                © 2026 School Management System
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const pass = document.getElementById('password');
+            pass.type = pass.type === 'password' ? 'text' : 'password';
+        }
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            const msgDiv = document.getElementById('message');
+            const loginBtn = document.getElementById('loginBtn');
+
+            msgDiv.innerText = "Checking login...";
+            msgDiv.className = "text-blue-600 text-sm mt-4 text-center font-medium";
+
+            loginBtn.disabled = true;
+            loginBtn.innerText = "Logging in...";
+
+            try {
+                const userQuery = await db.collection('users')
+                    .where('username', '==', username)
+                    .get();
+
+                if (userQuery.empty) throw new Error("Invalid username or password");
+
+                const userDoc = userQuery.docs[0];
+                const userData = userDoc.data();
+
+                if (userData.password !== password) throw new Error("Invalid username or password");
+                if (userData.status === 'pending') throw new Error("Account pending admin approval");
+                if (userData.status === 'rejected') throw new Error("Account rejected by admin");
+
+                await auth.signInWithEmailAndPassword(userData.email, password);
+
+                localStorage.setItem('currentUser', JSON.stringify({
+                    id: userDoc.id,
+                    ...userData
+                }));
+
+                msgDiv.innerText = "Login successful! Redirecting...";
+                msgDiv.className = "text-green-600 text-sm mt-4 text-center font-medium";
+
+                setTimeout(() => {
+                    window.location.href = userData.role === 'admin' ? 'admin.html' : 'teacher.html';
+                }, 800);
+
+            } catch (err) {
+                msgDiv.innerText = err.message;
+                msgDiv.className = "text-red-600 text-sm mt-4 text-center font-medium";
+
+                loginBtn.disabled = false;
+                loginBtn.innerText = "Login";
+            }
+        });
+    </script>
+    
+
+    <script>
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js')
+        .then(() => console.log('Service Worker Registered'))
+        .catch(error => console.log('Service Worker Error:', error));
+}
+</script>
+
+
+
+</body>
+</html>
